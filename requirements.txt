@@ -4,4 +4,3 @@ python-multipart
 google-genai
 librosa
 numpy
-soundfile

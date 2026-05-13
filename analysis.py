@@ -86,7 +86,7 @@ def analyze_audio(file_path: str) -> dict:
         raise ValueError(f"Unsupported format. Supported: {', '.join(SUPPORTED_FORMATS)}")
 
     print("Analyzing audio...")
-    y, sr = librosa.load(file_path, mono=True)
+    y, sr = librosa.load(file_path, mono=True, duration=60.0)
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     bpm = round(float(np.mean(tempo)), 1)
