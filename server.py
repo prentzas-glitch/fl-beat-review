@@ -85,15 +85,22 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
                     library_path: str, drum_library_path: str):
     try:
         try:
+            import numpy as np
+            import soundfile as sf
+            import librosa as _librosa
+
             audio_data = analyze_audio(tmp_path)
             print(f"[job {job_id[:8]}] audio analyzed — BPM={audio_data.get('bpm')}, key={audio_data.get('key')}")
-            suffix = Path(tmp_path).suffix.lower()
-            mime_map = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".flac": "audio/flac",
-                        ".aiff": "audio/aiff", ".ogg": "audio/ogg"}
-            mime_type = mime_map.get(suffix, "audio/wav")
-            with open(tmp_path, "rb") as f:
+
+            # Compress audio: mono 16kHz, max 60s → keeps inline size under 2MB
+            y, _ = _librosa.load(tmp_path, sr=16000, mono=True, duration=60.0)
+            compressed_tmp = tmp_path + "_compressed.wav"
+            sf.write(compressed_tmp, y, 16000)
+            with open(compressed_tmp, "rb") as f:
                 audio_bytes = f.read()
-            print(f"[job {job_id[:8]}] audio read ({len(audio_bytes)//1024}KB), starting agents…")
+            os.unlink(compressed_tmp)
+            mime_type = "audio/wav"
+            print(f"[job {job_id[:8]}] compressed to {len(audio_bytes)//1024}KB, starting agents…")
         finally:
             os.unlink(tmp_path)
 
