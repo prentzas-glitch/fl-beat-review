@@ -157,7 +157,7 @@ async def run_agent_team(
     print("[agents] Stage 2 done.")
 
     return {
-        "research_reports": {"artist": research, "genre": ""},
+        "research_reports": {"artist": research} if research else {},
         "specialist_reports": {},
         "final_review": final_review,
         "coordinator_prompt": rev_prompt,
