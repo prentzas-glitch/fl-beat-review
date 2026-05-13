@@ -25,7 +25,6 @@ Accuracy:
 import json
 import os
 import numpy as np
-import librosa
 from pathlib import Path
 
 AUDIO_EXTENSIONS = (".wav", ".mp3", ".aiff", ".flac", ".ogg")
@@ -61,6 +60,7 @@ def _extract_features(file_path: str) -> dict:
     Returns a dict of features, or {"error": ...} if analysis fails.
     """
     try:
+        import librosa
         y, sr = librosa.load(file_path, mono=True, duration=4.0)
 
         # Skip sounds that are effectively silent
