@@ -591,24 +591,50 @@
         fd.append('drum_library_path', drumLibraryPath);
 
         setStatus('Analyzing audio…');
-        const t1 = setTimeout(() => setStatus('Uploading to Gemini…'), 2000);
-        const t2 = setTimeout(() => setStatus('Phase 1 — Researching artist & genre…'), 5000);
-        const t3 = setTimeout(() => setStatus('Phase 2 — Running specialist agents…'), 18000);
-        const t4 = setTimeout(() => setStatus('Phase 3 — Coordinator synthesizing…'), 35000);
 
         try {
             const res = await fetch('/review', { method: 'POST', body: fd });
-            clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
             if (!res.ok) {
                 const e = await res.json();
                 throw new Error(e.detail || 'Something went wrong.');
             }
-            const data = await res.json();
+            const { job_id } = await res.json();
+
+            // Poll for result every 4 seconds
+            const messages = [
+                'Uploading to Gemini…',
+                'Phase 1 — Researching artist & genre…',
+                'Phase 1 — Researching artist & genre…',
+                'Phase 2 — Running specialist agents…',
+                'Phase 2 — Running specialist agents…',
+                'Phase 2 — Running specialist agents…',
+                'Phase 3 — Coordinator synthesizing…',
+            ];
+            let tick = 0;
+            const data = await new Promise((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    if (tick < messages.length) setStatus(messages[tick++]);
+                    try {
+                        const r = await fetch(`/result/${job_id}`);
+                        const d = await r.json();
+                        if (d.status === 'done') {
+                            clearInterval(interval);
+                            resolve(d);
+                        } else if (d.status === 'error') {
+                            clearInterval(interval);
+                            reject(new Error(d.error || 'Review failed.'));
+                        }
+                    } catch (e) {
+                        clearInterval(interval);
+                        reject(e);
+                    }
+                }, 4000);
+            });
+
             reviewPrompt = data.prompt;
             chatHistory  = [{ role: 'assistant', content: data.review }];
             showResults(data.audio_data, data.review, data.research_reports, data.specialist_reports);
         } catch (err) {
-            clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
             document.getElementById('loading').style.display = 'none';
             document.getElementById('upload-section').style.display = 'block';
             showErr(errEl, err.message);

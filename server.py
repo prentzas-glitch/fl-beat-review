@@ -1,5 +1,7 @@
+import asyncio
 import os
 import tempfile
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -21,6 +23,9 @@ BASE_DIR = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 gemini_client = genai.Client()
+
+# In-memory job store — good enough for a demo
+jobs: dict[str, dict] = {}
 
 
 @app.get("/")
@@ -52,11 +57,6 @@ class IndexDrumsRequest(BaseModel):
 
 @app.post("/index-drums")
 def index_drums(req: IndexDrumsRequest):
-    """
-    Build a drum index for a folder. Analyzes every audio file with librosa
-    and saves drum_index.json inside the folder.
-    This runs once — results are cached and reused on every beat review.
-    """
     try:
         summary = build_index(req.folder_path)
         return {"summary": summary, "success": True}
@@ -71,7 +71,6 @@ class CheckIndexRequest(BaseModel):
 
 @app.post("/check-drum-index")
 def check_drum_index(req: CheckIndexRequest):
-    """Check if a drum index already exists for a folder."""
     index = load_index(req.folder_path)
     if index is None:
         return {"exists": False}
@@ -80,64 +79,33 @@ def check_drum_index(req: CheckIndexRequest):
     return {"exists": True, "summary": summary}
 
 
-@app.post("/review")
-async def review(
-    file: UploadFile = File(...),
-    genre: str = Form(...),
-    reference: str = Form(...),
-    skill_level: str = Form(...),
-    library_path: str = Form(default=""),
-    drum_library_path: str = Form(default=""),
-):
-    filename = file.filename or ""
-    if not filename.lower().endswith(SUPPORTED_FORMATS):
-        raise HTTPException(400, f"Unsupported format. Supported: {', '.join(SUPPORTED_FORMATS)}")
-
-    if skill_level not in SKILL_LEVELS:
-        raise HTTPException(400, "Invalid skill level.")
-
-    genre = genre.strip().lower()
-    genre_profile = GENRE_PROFILES.get(genre, GENRE_PROFILES["trap"])
-
-    # Save upload to a temp file
-    suffix = Path(filename).suffix
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
-
+async def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
+                          genre_profile: dict, skill_level: str,
+                          library_path: str, drum_library_path: str):
     try:
-        # 1. Analyze locally (librosa needs the file on disk)
         audio_data = analyze_audio(tmp_path)
-
-        # 2. Upload to Gemini once — all agents share this one reference
         audio_file = gemini_client.files.upload(file=tmp_path)
     finally:
-        # Local temp file no longer needed after analysis + upload
         os.unlink(tmp_path)
 
-    # 3. Scan general sound library if a path was provided
     library_prompt = ""
     if library_path.strip():
         try:
             library = scan_library(library_path.strip())
-            detected_key = audio_data.get("key", "")
-            library_prompt = format_library_for_prompt(library, detected_key)
-        except (FileNotFoundError, ValueError):
-            library_prompt = ""
+            library_prompt = format_library_for_prompt(library, audio_data.get("key", ""))
+        except Exception:
+            pass
 
-    # 3b. Load drum index and find candidates if a drum library path was provided
     drum_candidates_prompt = ""
     if drum_library_path.strip():
         try:
             index = load_index(drum_library_path.strip())
             if index:
-                detected_key = audio_data.get("key", "")
-                candidates   = find_candidates(index, target_key=detected_key, n=3)
-                drum_candidates_prompt = format_candidates_for_prompt(candidates, detected_key)
+                candidates = find_candidates(index, target_key=audio_data.get("key", ""), n=3)
+                drum_candidates_prompt = format_candidates_for_prompt(candidates, audio_data.get("key", ""))
         except Exception:
-            drum_candidates_prompt = ""
+            pass
 
-    # 4. Run the agent team, then clean up the Gemini file
     try:
         result = await run_agent_team(
             client=gemini_client,
@@ -153,7 +121,8 @@ async def review(
     finally:
         gemini_client.files.delete(name=audio_file.name)
 
-    return {
+    jobs[job_id] = {
+        "status": "done",
         "audio_data": audio_data,
         "review": result["final_review"],
         "prompt": result["coordinator_prompt"],
@@ -163,17 +132,56 @@ async def review(
     }
 
 
+@app.post("/review")
+async def review(
+    file: UploadFile = File(...),
+    genre: str = Form(...),
+    reference: str = Form(...),
+    skill_level: str = Form(...),
+    library_path: str = Form(default=""),
+    drum_library_path: str = Form(default=""),
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith(SUPPORTED_FORMATS):
+        raise HTTPException(400, f"Unsupported format. Supported: {', '.join(SUPPORTED_FORMATS)}")
+    if skill_level not in SKILL_LEVELS:
+        raise HTTPException(400, "Invalid skill level.")
+
+    genre = genre.strip().lower()
+    genre_profile = GENRE_PROFILES.get(genre, GENRE_PROFILES["trap"])
+
+    suffix = Path(filename).suffix
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {"status": "pending"}
+
+    asyncio.create_task(_run_review_job(
+        job_id, tmp_path, genre, reference, genre_profile,
+        skill_level, library_path, drum_library_path,
+    ))
+
+    return {"job_id": job_id}
+
+
+@app.get("/result/{job_id}")
+def get_result(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
 class ChatRequest(BaseModel):
     message: str
     prompt: str
-    history: list[dict]  # [{"role": "user"|"assistant", "content": str}]
+    history: list[dict]
 
 
 @app.post("/chat")
 def chat(req: ChatRequest):
-    # The coordinator prompt is the opener — it has full beat context
-    # (all 4 specialist reports + genre/reference/skill level) so the
-    # model can answer follow-up questions with complete knowledge.
     gemini_history = [
         {"role": "user", "parts": [{"text": req.prompt}]},
     ]
