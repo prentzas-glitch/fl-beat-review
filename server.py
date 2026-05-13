@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import json
 import os
 import tempfile
 import threading
@@ -26,8 +27,39 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 gemini_client = genai.Client()
 
-# In-memory job store — good enough for a demo
+JOBS_DIR = Path(tempfile.gettempdir()) / "fl_jobs"
+JOBS_DIR.mkdir(exist_ok=True)
+
+# In-memory job store (fast path); /tmp files are the fallback across restarts
 jobs: dict[str, dict] = {}
+
+
+def _job_path(job_id: str) -> Path:
+    return JOBS_DIR / f"{job_id}.json"
+
+
+def _prompt_path(job_id: str) -> Path:
+    return JOBS_DIR / f"{job_id}_prompt.txt"
+
+
+def _save_job(job_id: str, data: dict) -> None:
+    jobs[job_id] = data
+    try:
+        _job_path(job_id).write_text(json.dumps(data))
+    except Exception:
+        pass
+
+
+def _load_job(job_id: str) -> dict | None:
+    if job_id in jobs:
+        return jobs[job_id]
+    p = _job_path(job_id)
+    if p.exists():
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            pass
+    return None
 
 
 @app.get("/")
@@ -141,18 +173,22 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
         def _trunc(text, limit=1500):
             return text[:limit] + "…" if len(text) > limit else text
 
-        jobs[job_id] = {
+        _save_job(job_id, {
             "status": "done",
             "audio_data": audio_data,
             "review": result["final_review"],
             "genre": genre,
             "research_reports": {k: _trunc(v) for k, v in result["research_reports"].items()},
             "specialist_reports": {k: _trunc(v) for k, v in result["specialist_reports"].items()},
-        }
+        })
         # Store prompt separately for chat — not included in main result
+        try:
+            _prompt_path(job_id).write_text(result["coordinator_prompt"])
+        except Exception:
+            pass
         jobs[job_id + "_prompt"] = result["coordinator_prompt"]
     except Exception as e:
-        jobs[job_id] = {"status": "error", "error": str(e)}
+        _save_job(job_id, {"status": "error", "error": str(e)})
 
 
 @app.post("/review")
@@ -179,7 +215,7 @@ async def review(
         tmp_path = tmp.name
 
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "pending"}
+    _save_job(job_id, {"status": "pending"})
 
     t = threading.Thread(
         target=_run_review_job,
@@ -194,7 +230,7 @@ async def review(
 
 @app.get("/result/{job_id}")
 def get_result(job_id: str):
-    job = jobs.get(job_id)
+    job = _load_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     return job
@@ -202,10 +238,15 @@ def get_result(job_id: str):
 
 @app.get("/prompt/{job_id}")
 def get_prompt(job_id: str):
-    prompt = jobs.get(job_id + "_prompt")
-    if not prompt:
-        raise HTTPException(404, "Prompt not found")
-    return {"prompt": prompt}
+    if job_id + "_prompt" in jobs:
+        return {"prompt": jobs[job_id + "_prompt"]}
+    p = _prompt_path(job_id)
+    if p.exists():
+        try:
+            return {"prompt": p.read_text()}
+        except Exception:
+            pass
+    raise HTTPException(404, "Prompt not found")
 
 
 class ChatRequest(BaseModel):

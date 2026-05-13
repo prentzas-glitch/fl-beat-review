@@ -616,6 +616,10 @@
                     if (tick < messages.length) setStatus(messages[tick++]);
                     try {
                         const r = await fetch(`/result/${job_id}`);
+                        if (!r.ok) {
+                            // Server restarted mid-job — keep polling
+                            return;
+                        }
                         const d = await r.json();
                         if (d.status === 'done') {
                             clearInterval(interval);
@@ -624,9 +628,8 @@
                             clearInterval(interval);
                             reject(new Error(d.error || 'Review failed.'));
                         }
-                    } catch (e) {
-                        clearInterval(interval);
-                        reject(e);
+                    } catch (_) {
+                        // Network hiccup — keep polling
                     }
                 }, 4000);
             });
