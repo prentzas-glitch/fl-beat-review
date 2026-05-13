@@ -86,7 +86,9 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
     try:
         try:
             audio_data = analyze_audio(tmp_path)
+            print(f"[job {job_id[:8]}] audio analyzed — BPM={audio_data.get('bpm')}, key={audio_data.get('key')}")
             audio_file = gemini_client.files.upload(file=tmp_path)
+            print(f"[job {job_id[:8]}] file uploaded to Gemini: {audio_file.name}")
         finally:
             os.unlink(tmp_path)
 
@@ -108,6 +110,7 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
             except Exception:
                 pass
 
+        print(f"[job {job_id[:8]}] starting agent team…")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -126,6 +129,7 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
             loop.close()
             gemini_client.files.delete(name=audio_file.name)
 
+        print(f"[job {job_id[:8]}] done!")
         jobs[job_id] = {
             "status": "done",
             "audio_data": audio_data,
