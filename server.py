@@ -1,6 +1,7 @@
 import asyncio
 import os
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 
@@ -79,57 +80,63 @@ def check_drum_index(req: CheckIndexRequest):
     return {"exists": True, "summary": summary}
 
 
-async def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
-                          genre_profile: dict, skill_level: str,
-                          library_path: str, drum_library_path: str):
+def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
+                    genre_profile: dict, skill_level: str,
+                    library_path: str, drum_library_path: str):
     try:
-        audio_data = analyze_audio(tmp_path)
-        audio_file = gemini_client.files.upload(file=tmp_path)
-    finally:
-        os.unlink(tmp_path)
-
-    library_prompt = ""
-    if library_path.strip():
         try:
-            library = scan_library(library_path.strip())
-            library_prompt = format_library_for_prompt(library, audio_data.get("key", ""))
-        except Exception:
-            pass
+            audio_data = analyze_audio(tmp_path)
+            audio_file = gemini_client.files.upload(file=tmp_path)
+        finally:
+            os.unlink(tmp_path)
 
-    drum_candidates_prompt = ""
-    if drum_library_path.strip():
+        library_prompt = ""
+        if library_path.strip():
+            try:
+                library = scan_library(library_path.strip())
+                library_prompt = format_library_for_prompt(library, audio_data.get("key", ""))
+            except Exception:
+                pass
+
+        drum_candidates_prompt = ""
+        if drum_library_path.strip():
+            try:
+                index = load_index(drum_library_path.strip())
+                if index:
+                    candidates = find_candidates(index, target_key=audio_data.get("key", ""), n=3)
+                    drum_candidates_prompt = format_candidates_for_prompt(candidates, audio_data.get("key", ""))
+            except Exception:
+                pass
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            index = load_index(drum_library_path.strip())
-            if index:
-                candidates = find_candidates(index, target_key=audio_data.get("key", ""), n=3)
-                drum_candidates_prompt = format_candidates_for_prompt(candidates, audio_data.get("key", ""))
-        except Exception:
-            pass
+            result = loop.run_until_complete(run_agent_team(
+                client=gemini_client,
+                audio_file=audio_file,
+                genre=genre,
+                reference=reference,
+                genre_profile=genre_profile,
+                audio_data=audio_data,
+                skill_level=skill_level,
+                library_prompt=library_prompt,
+                drum_candidates_prompt=drum_candidates_prompt,
+            ))
+        finally:
+            loop.close()
+            gemini_client.files.delete(name=audio_file.name)
 
-    try:
-        result = await run_agent_team(
-            client=gemini_client,
-            audio_file=audio_file,
-            genre=genre,
-            reference=reference,
-            genre_profile=genre_profile,
-            audio_data=audio_data,
-            skill_level=skill_level,
-            library_prompt=library_prompt,
-            drum_candidates_prompt=drum_candidates_prompt,
-        )
-    finally:
-        gemini_client.files.delete(name=audio_file.name)
-
-    jobs[job_id] = {
-        "status": "done",
-        "audio_data": audio_data,
-        "review": result["final_review"],
-        "prompt": result["coordinator_prompt"],
-        "genre": genre,
-        "research_reports": result["research_reports"],
-        "specialist_reports": result["specialist_reports"],
-    }
+        jobs[job_id] = {
+            "status": "done",
+            "audio_data": audio_data,
+            "review": result["final_review"],
+            "prompt": result["coordinator_prompt"],
+            "genre": genre,
+            "research_reports": result["research_reports"],
+            "specialist_reports": result["specialist_reports"],
+        }
+    except Exception as e:
+        jobs[job_id] = {"status": "error", "error": str(e)}
 
 
 @app.post("/review")
@@ -158,10 +165,13 @@ async def review(
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "pending"}
 
-    asyncio.create_task(_run_review_job(
-        job_id, tmp_path, genre, reference, genre_profile,
-        skill_level, library_path, drum_library_path,
-    ))
+    t = threading.Thread(
+        target=_run_review_job,
+        args=(job_id, tmp_path, genre, reference, genre_profile,
+              skill_level, library_path, drum_library_path),
+        daemon=False,
+    )
+    t.start()
 
     return {"job_id": job_id}
 
