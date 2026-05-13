@@ -20,6 +20,14 @@ def analyze_audio(file_path: str) -> dict:
     except Exception:
         pass
 
+    if duration_sec == 0.0 and file_path.lower().endswith(".wav"):
+        try:
+            import wave
+            with wave.open(file_path, "rb") as wf:
+                duration_sec = round(wf.getnframes() / wf.getframerate(), 2)
+        except Exception:
+            pass
+
     file_size_kb = round(os.path.getsize(file_path) / 1024, 1)
 
     return {

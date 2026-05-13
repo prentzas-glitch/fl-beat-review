@@ -115,21 +115,32 @@ def check_drum_index(req: CheckIndexRequest):
 
 def _parse_stats(review_text: str, audio_data: dict) -> dict:
     """Extract BPM and key from the STATS block Gemini outputs."""
-    m = re.search(r'STATS\s*(.*?)\s*END_STATS', review_text, re.DOTALL)
+    # Strip markdown code fences before searching
+    clean = re.sub(r'```[^\n]*\n?', '', review_text)
+    m = re.search(r'STATS\s*(.*?)\s*END_STATS', clean, re.DOTALL)
+    if not m:
+        m = re.search(r'STATS\s*(.*?)\s*END_STATS', review_text, re.DOTALL)
     if m:
         for line in m.group(1).splitlines():
+            line = line.strip()
             if line.startswith('bpm:'):
                 try:
                     audio_data['bpm'] = float(line.split(':', 1)[1].strip())
                 except ValueError:
                     pass
             elif line.startswith('key:'):
-                audio_data['key'] = line.split(':', 1)[1].strip().strip('"')
+                val = line.split(':', 1)[1].strip().strip('"')
+                # Remove parenthetical qualifiers like "(Hypothetical, ...)"
+                val = re.sub(r'\s*\(.*?\)\s*$', '', val).strip()
+                if val:
+                    audio_data['key'] = val
     return audio_data
 
 
 def _strip_stats(review_text: str) -> str:
-    return re.sub(r'STATS\s*.*?\s*END_STATS\s*', '', review_text, flags=re.DOTALL).strip()
+    text = re.sub(r'```[^\n]*\n?STATS\s*.*?\s*END_STATS\s*```\s*', '', review_text, flags=re.DOTALL)
+    text = re.sub(r'STATS\s*.*?\s*END_STATS\s*', '', text, flags=re.DOTALL)
+    return text.strip()
 
 
 def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,

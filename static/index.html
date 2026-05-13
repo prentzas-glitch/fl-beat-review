@@ -769,13 +769,11 @@
         // Stats
         const grid = document.getElementById('stat-grid');
         grid.innerHTML = '';
+        const fmt = v => (v == null || v === '' || v === 0 || v === '0s') ? '—' : v;
         [
-            { label: 'BPM',            value: ad.bpm },
-            { label: 'Key',            value: ad.key,                          sm: true },
-            { label: 'Key Confidence', value: pct(ad.key_confidence) },
-            { label: 'Duration',       value: ad.duration_sec + 's' },
-            { label: 'Peak',           value: ad.peak },
-            { label: 'RMS Avg',        value: ad.rms_avg },
+            { label: 'BPM',      value: fmt(ad.bpm) },
+            { label: 'Key',      value: fmt(ad.key), sm: true },
+            { label: 'Duration', value: ad.duration_sec ? ad.duration_sec + 's' : '—' },
         ].forEach(s => {
             grid.innerHTML += `
                 <div class="stat">
@@ -851,8 +849,6 @@
         document.getElementById('messages').innerHTML = '';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-
-    function pct(v) { return v != null ? (v * 100).toFixed(0) + '%' : '—'; }
 
     function resetApp() {
         document.getElementById('results').style.display = 'none';
