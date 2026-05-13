@@ -13,10 +13,8 @@ _MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98,
 
 
 def detect_key(y: np.ndarray, sr: int) -> dict:
-    # Strip drums and bass transients before analysis so key detection
-    # runs only on harmonic content (melodies, chords, pads)
-    y_harmonic, _ = librosa.effects.hpss(y)
-    chroma = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr)
+    # chroma_stft is much faster than chroma_cqt on slow hardware
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr, n_fft=2048, hop_length=512)
     chroma_mean = chroma.mean(axis=1)
 
     best_key = ""
@@ -87,7 +85,7 @@ def analyze_audio(file_path: str) -> dict:
         raise ValueError(f"Unsupported format. Supported: {', '.join(SUPPORTED_FORMATS)}")
 
     print("Analyzing audio...")
-    y, sr = librosa.load(file_path, mono=True, sr=16000, duration=30.0)
+    y, sr = librosa.load(file_path, mono=True, duration=30.0)
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     bpm = round(float(np.mean(tempo)), 1)
