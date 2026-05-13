@@ -78,11 +78,10 @@ def _review_prompt(genre: str, reference: str, audio_data: dict,
 Producer skill level: {skill['label']} — {skill['description']}
 Tone: {skill['tone']}
 
+File info: duration={audio_data.get('duration_sec', '?')}s
+
 == Research Context ==
 {research}
-
-== Audio Analysis ==
-{json.dumps(audio_data, indent=2)}
 
 Genre baseline BPM: {bpm_low}–{bpm_high} | Drum feel: {genre_profile['drum_feel']}
 
@@ -93,13 +92,18 @@ FL Studio tools: Parametric EQ 2, Fruity Compressor, Maximus, FPC, Gross Beat,
 FLEX, Sytrus, Fruity Delay 3, Fruity Reeverb 2, Stereo Enhancer, Pitcher.
 
 Rules:
+- Listen carefully to detect the actual BPM, key, and sonic characteristics.
 - Use the research context to calibrate what "good" sounds like for this genre/artist.
 - Compare the beat against the reference — how close or far is it?
 - Give exact FL Studio settings where relevant (frequencies, ratios, ms).
-- When recommending sounds, reference files from the library by exact filename.
 - Keep every section tight. Producers read fast.
 
-== Output format — follow exactly ==
+== Output format — follow EXACTLY, including the STATS block ==
+
+STATS
+bpm: <detected BPM as number>
+key: <detected key, e.g. "F# minor">
+END_STATS
 
 ### 1. BPM & Tempo
 ### 2. Key & Sound Selection

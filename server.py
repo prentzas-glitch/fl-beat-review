@@ -1,7 +1,7 @@
 import asyncio
-import gc
 import json
 import os
+import re
 import tempfile
 import threading
 import uuid
@@ -113,13 +113,31 @@ def check_drum_index(req: CheckIndexRequest):
     return {"exists": True, "summary": summary}
 
 
+def _parse_stats(review_text: str, audio_data: dict) -> dict:
+    """Extract BPM and key from the STATS block Gemini outputs."""
+    m = re.search(r'STATS\s*(.*?)\s*END_STATS', review_text, re.DOTALL)
+    if m:
+        for line in m.group(1).splitlines():
+            if line.startswith('bpm:'):
+                try:
+                    audio_data['bpm'] = float(line.split(':', 1)[1].strip())
+                except ValueError:
+                    pass
+            elif line.startswith('key:'):
+                audio_data['key'] = line.split(':', 1)[1].strip().strip('"')
+    return audio_data
+
+
+def _strip_stats(review_text: str) -> str:
+    return re.sub(r'STATS\s*.*?\s*END_STATS\s*', '', review_text, flags=re.DOTALL).strip()
+
+
 def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
                     genre_profile: dict, skill_level: str,
                     library_path: str, drum_library_path: str):
     try:
         try:
             audio_data = analyze_audio(tmp_path)
-            print(f"[job {job_id[:8]}] audio analyzed — BPM={audio_data.get('bpm')}, key={audio_data.get('key')}")
             with open(tmp_path, "rb") as f:
                 audio_bytes = f.read()
             suffix = Path(tmp_path).suffix.lower()
@@ -127,7 +145,6 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
                         ".aiff": "audio/aiff", ".ogg": "audio/ogg"}
             mime_type = mime_map.get(suffix, "audio/wav")
             print(f"[job {job_id[:8]}] audio ready ({len(audio_bytes)//1024}KB), starting agents…")
-            gc.collect()
         finally:
             os.unlink(tmp_path)
 
@@ -169,17 +186,20 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
             loop.close()
 
         print(f"[job {job_id[:8]}] done!")
-        # Truncate agent reports to keep response under 50KB
+        raw_review = result["final_review"]
+        audio_data = _parse_stats(raw_review, audio_data)
+        clean_review = _strip_stats(raw_review)
+
         def _trunc(text, limit=1500):
             return text[:limit] + "…" if len(text) > limit else text
 
         _save_job(job_id, {
             "status": "done",
             "audio_data": audio_data,
-            "review": result["final_review"],
+            "review": clean_review,
             "genre": genre,
             "research_reports": {k: _trunc(v) for k, v in result["research_reports"].items()},
-            "specialist_reports": {k: _trunc(v) for k, v in result["specialist_reports"].items()},
+            "specialist_reports": {},
         })
         # Store prompt separately for chat — not included in main result
         try:
