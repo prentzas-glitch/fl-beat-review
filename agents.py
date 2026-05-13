@@ -33,15 +33,15 @@ from genres import SKILL_LEVELS
 from ai import MODEL
 
 
-def _with_backoff(fn, *args, max_attempts=6):
-    """Retry a Gemini call on 429 with exponential backoff."""
+def _with_backoff(fn, *args, max_attempts=4):
+    """Retry a Gemini call on 429 with short fixed delay."""
     for attempt in range(max_attempts):
         try:
             return fn(*args)
         except Exception as e:
             if "429" in str(e) and attempt < max_attempts - 1:
-                wait = min(60, 10 * (2 ** attempt))
-                time.sleep(wait)
+                print(f"[429] attempt {attempt+1}/{max_attempts}, retrying in 15s…")
+                time.sleep(15)
             else:
                 raise
 
