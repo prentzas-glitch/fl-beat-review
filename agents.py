@@ -25,11 +25,25 @@ Why research agents?
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass
 from google import genai
 from google.genai import types
 from genres import SKILL_LEVELS
 from ai import MODEL
+
+
+def _with_backoff(fn, *args, max_attempts=6):
+    """Retry a Gemini call on 429 with exponential backoff."""
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args)
+        except Exception as e:
+            if "429" in str(e) and attempt < max_attempts - 1:
+                wait = min(60, 10 * (2 ** attempt))
+                time.sleep(wait)
+            else:
+                raise
 
 
 # ── Agent result ──────────────────────────────────────────────────────────────
@@ -45,11 +59,12 @@ class AgentResult:
 # Used by specialist agents that need to listen to the beat.
 
 def _call_gemini_sync(client: genai.Client, prompt: str, audio_file) -> str:
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[prompt, audio_file],
-    )
-    return response.text
+    def _call():
+        return client.models.generate_content(
+            model=MODEL,
+            contents=[prompt, audio_file],
+        ).text
+    return _with_backoff(_call)
 
 
 # ── Gemini call — with Google Search grounding, no audio ─────────────────────
@@ -59,14 +74,15 @@ def _call_gemini_sync(client: genai.Client, prompt: str, audio_file) -> str:
 # an artist or genre rather than relying only on training data.
 
 def _call_gemini_search_sync(client: genai.Client, prompt: str) -> str:
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())]
-        ),
-    )
-    return response.text
+    def _call():
+        return client.models.generate_content(
+            model=MODEL,
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            ),
+        ).text
+    return _with_backoff(_call)
 
 
 # ── Async wrappers ────────────────────────────────────────────────────────────
