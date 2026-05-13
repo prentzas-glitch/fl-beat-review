@@ -87,8 +87,13 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
         try:
             audio_data = analyze_audio(tmp_path)
             print(f"[job {job_id[:8]}] audio analyzed — BPM={audio_data.get('bpm')}, key={audio_data.get('key')}")
-            audio_file = gemini_client.files.upload(file=tmp_path)
-            print(f"[job {job_id[:8]}] file uploaded to Gemini: {audio_file.name}")
+            suffix = Path(tmp_path).suffix.lower()
+            mime_map = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".flac": "audio/flac",
+                        ".aiff": "audio/aiff", ".ogg": "audio/ogg"}
+            mime_type = mime_map.get(suffix, "audio/wav")
+            with open(tmp_path, "rb") as f:
+                audio_bytes = f.read()
+            print(f"[job {job_id[:8]}] audio read ({len(audio_bytes)//1024}KB), starting agents…")
         finally:
             os.unlink(tmp_path)
 
@@ -116,7 +121,8 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
         try:
             result = loop.run_until_complete(run_agent_team(
                 client=gemini_client,
-                audio_file=audio_file,
+                audio_bytes=audio_bytes,
+                mime_type=mime_type,
                 genre=genre,
                 reference=reference,
                 genre_profile=genre_profile,
@@ -127,7 +133,6 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
             ))
         finally:
             loop.close()
-            gemini_client.files.delete(name=audio_file.name)
 
         print(f"[job {job_id[:8]}] done!")
         jobs[job_id] = {

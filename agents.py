@@ -58,11 +58,11 @@ class AgentResult:
 # ── Gemini call — with audio ──────────────────────────────────────────────────
 # Used by specialist agents that need to listen to the beat.
 
-def _call_gemini_sync(client: genai.Client, prompt: str, audio_file) -> str:
+def _call_gemini_sync(client: genai.Client, prompt: str, audio_bytes: bytes, mime_type: str) -> str:
     def _call():
         return client.models.generate_content(
             model=MODEL,
-            contents=[prompt, audio_file],
+            contents=[prompt, types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
         ).text
     return _with_backoff(_call)
 
@@ -90,12 +90,12 @@ def _call_gemini_search_sync(client: genai.Client, prompt: str) -> str:
 # thread pool so multiple agents can run at the same time instead of waiting
 # for each one to finish before starting the next.
 
-async def _run_agent(client, name: str, key: str, prompt: str, audio_file) -> AgentResult:
+async def _run_agent(client, name: str, key: str, prompt: str, audio_bytes: bytes, mime_type: str) -> AgentResult:
     """Specialist agent — listens to the audio file."""
     loop = asyncio.get_running_loop()
     try:
         report = await loop.run_in_executor(
-            None, _call_gemini_sync, client, prompt, audio_file
+            None, _call_gemini_sync, client, prompt, audio_bytes, mime_type
         )
     except Exception as e:
         report = f"[{name} could not complete its analysis: {e}]"
@@ -350,7 +350,8 @@ Detected key: {audio_data.get('key', 'unknown')}
 
 async def run_agent_team(
     client: genai.Client,
-    audio_file,
+    audio_bytes: bytes,
+    mime_type: str,
     genre: str,
     reference: str,
     genre_profile: dict,
@@ -396,13 +397,13 @@ async def run_agent_team(
     # All 4 run in parallel. Each gets the research context injected.
     specialist_results: list[AgentResult] = await asyncio.gather(
         _run_agent(client, "Mixing Engineer",               "mixing",
-                   _mixing_prompt(genre, audio_data, skill, research_context), audio_file),
+                   _mixing_prompt(genre, audio_data, skill, research_context), audio_bytes, mime_type),
         _run_agent(client, "Drums & Patterns Specialist",   "drums",
-                   _drums_prompt(genre, genre_profile, audio_data, skill, research_context, library_prompt, drum_candidates_prompt), audio_file),
+                   _drums_prompt(genre, genre_profile, audio_data, skill, research_context, library_prompt, drum_candidates_prompt), audio_bytes, mime_type),
         _run_agent(client, "Sound Design & Key Specialist", "sound_design",
-                   _sound_design_prompt(genre, reference, audio_data, skill, research_context, library_prompt), audio_file),
+                   _sound_design_prompt(genre, reference, audio_data, skill, research_context, library_prompt), audio_bytes, mime_type),
         _run_agent(client, "Arrangement Specialist",        "arrangement",
-                   _arrangement_prompt(genre, audio_data, skill, research_context), audio_file),
+                   _arrangement_prompt(genre, audio_data, skill, research_context), audio_bytes, mime_type),
     )
     specialist_reports = {r.key: r.report for r in specialist_results}
 
@@ -413,7 +414,7 @@ async def run_agent_team(
     )
     loop = asyncio.get_running_loop()
     final_review = await loop.run_in_executor(
-        None, _call_gemini_sync, client, coord_prompt, audio_file
+        None, _call_gemini_sync, client, coord_prompt, audio_bytes, mime_type
     )
 
     return {
