@@ -135,15 +135,20 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
             loop.close()
 
         print(f"[job {job_id[:8]}] done!")
+        # Truncate agent reports to keep response under 50KB
+        def _trunc(text, limit=1500):
+            return text[:limit] + "…" if len(text) > limit else text
+
         jobs[job_id] = {
             "status": "done",
             "audio_data": audio_data,
             "review": result["final_review"],
-            "prompt": result["coordinator_prompt"],
             "genre": genre,
-            "research_reports": result["research_reports"],
-            "specialist_reports": result["specialist_reports"],
+            "research_reports": {k: _trunc(v) for k, v in result["research_reports"].items()},
+            "specialist_reports": {k: _trunc(v) for k, v in result["specialist_reports"].items()},
         }
+        # Store prompt separately for chat — not included in main result
+        jobs[job_id + "_prompt"] = result["coordinator_prompt"]
     except Exception as e:
         jobs[job_id] = {"status": "error", "error": str(e)}
 
@@ -191,6 +196,14 @@ def get_result(job_id: str):
     if not job:
         raise HTTPException(404, "Job not found")
     return job
+
+
+@app.get("/prompt/{job_id}")
+def get_prompt(job_id: str):
+    prompt = jobs.get(job_id + "_prompt")
+    if not prompt:
+        raise HTTPException(404, "Prompt not found")
+    return {"prompt": prompt}
 
 
 class ChatRequest(BaseModel):

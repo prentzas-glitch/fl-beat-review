@@ -631,7 +631,12 @@
                 }, 4000);
             });
 
-            reviewPrompt = data.prompt;
+            // Fetch prompt separately (kept off the main result to reduce response size)
+            try {
+                const pr = await fetch(`/prompt/${job_id}`);
+                const pd = await pr.json();
+                reviewPrompt = pd.prompt || '';
+            } catch (_) { reviewPrompt = ''; }
             chatHistory  = [{ role: 'assistant', content: data.review }];
             showResults(data.audio_data, data.review, data.research_reports, data.specialist_reports);
         } catch (err) {
