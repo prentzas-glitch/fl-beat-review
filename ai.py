@@ -2,7 +2,7 @@ from google import genai
 from genres import SKILL_LEVELS
 
 client = genai.Client()
-MODEL = "gemini-2.5-flash-preview-04-17"
+MODEL = "gemini-2.0-flash"
 
 
 def get_beat_review(file_path: str, prompt: str) -> str:
