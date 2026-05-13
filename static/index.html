@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FL Beat Review</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg: #0c0c0e;
+            --card: #141416;
+            --card2: #1a1a1d;
+            --border: #26262b;
+            --accent: #8b5cf6;
+            --accent-dark: #7c3aed;
+            --text: #f0f0f4;
+            --muted: #6b7280;
+            --warn: #f59e0b;
+            --red: #ef4444;
+            --r: 10px;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 15px;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 40px 16px 80px;
+        }
+
+        .container { max-width: 740px; margin: 0 auto; }
+
+        /* ── Header ── */
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
+        header p { color: var(--muted); margin-top: 6px; font-size: 14px; }
+        .fl-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-right: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 24px;
+            margin-bottom: 14px;
+        }
+
+        /* ── Drop zone ── */
+        #drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--r);
+            padding: 52px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            margin-bottom: 14px;
+        }
+        #drop-zone:hover, #drop-zone.over {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.05);
+        }
+        #drop-zone .dz-icon { font-size: 36px; margin-bottom: 12px; }
+        #drop-zone h2 { font-size: 17px; margin-bottom: 6px; }
+        #drop-zone p { color: var(--muted); font-size: 13px; }
+        #file-input { display: none; }
+
+        /* ── File chip ── */
+        #file-chip {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        #file-chip .chip-icon { font-size: 22px; }
+        #file-chip .chip-info { flex: 1; }
+        #file-chip .chip-name { font-weight: 500; font-size: 14px; }
+        #file-chip .chip-size { color: var(--muted); font-size: 12px; margin-top: 1px; }
+        #file-chip .chip-remove {
+            background: none; border: none; color: var(--muted);
+            cursor: pointer; font-size: 17px; padding: 4px; line-height: 1;
+        }
+        #file-chip .chip-remove:hover { color: var(--red); }
+
+        /* ── Form ── */
+        .form-group { margin-bottom: 20px; }
+        .form-group:last-of-type { margin-bottom: 0; }
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+        input[type="text"] {
+            width: 100%;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            padding: 10px 12px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: var(--font);
+        }
+        input[type="text"]:focus { border-color: var(--accent); }
+        input[type="text"]::placeholder { color: var(--muted); }
+
+        /* ── Skill pills ── */
+        .skill-pills { display: flex; gap: 8px; }
+        .skill-pill { flex: 1; position: relative; }
+        .skill-pill input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+        .skill-pill label {
+            display: block;
+            text-align: center;
+            padding: 10px 6px;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .skill-pill label .pname { font-weight: 600; font-size: 14px; display: block; color: var(--text); }
+        .skill-pill label .pdesc { font-size: 11px; color: var(--muted); display: block; margin-top: 3px; }
+        .skill-pill input:checked + label {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            width: 100%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 13px;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-top: 20px;
+            font-family: var(--font);
+        }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        .btn-ghost {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 13px;
+            padding: 8px 14px;
+            transition: border-color 0.15s, color 0.15s;
+            margin-bottom: 16px;
+            font-family: var(--font);
+        }
+        .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+        /* ── Error ── */
+        .error-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 8px;
+            color: #fca5a5;
+            font-size: 13px;
+            padding: 10px 14px;
+            margin-top: 14px;
+        }
+
+        /* ── Loading ── */
+        #loading { display: none; text-align: center; padding: 56px 24px; }
+        .spinner {
+            width: 38px; height: 38px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            margin: 0 auto 18px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #load-status { color: var(--muted); font-size: 14px; }
+
+        /* ── Results ── */
+        #results { display: none; }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }
+
+        /* Analysis collapsible */
+        .analysis-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        .chevron { color: var(--muted); font-size: 12px; transition: transform 0.2s; }
+        .analysis-header.open .chevron { transform: rotate(180deg); }
+        #analysis-body { display: none; margin-top: 16px; }
+        #analysis-body.open { display: block; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .stat {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 17px; font-weight: 700; margin-top: 3px; }
+        .stat-value.sm { font-size: 14px; }
+
+        .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            padding: 3px 10px;
+            color: var(--muted);
+        }
+        .tag.warn { border-color: rgba(245,158,11,0.5); color: var(--warn); }
+
+        /* Agent reports */
+        .agent-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+        .agent-header:last-of-type { border-bottom: none; }
+        .agent-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--muted);
+        }
+        .agent-body { display: none; padding: 14px 0 4px; }
+        .agent-body.open { display: block; }
+
+        /* Shared markdown styles for review + agent reports */
+        #review-content, .agent-body { line-height: 1.75; }
+        #review-content h3, .agent-body h3 {
+            font-size: 14px; font-weight: 700;
+            margin: 22px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+        #review-content h3:first-child, .agent-body h3:first-child { margin-top: 0; }
+        #review-content p, .agent-body p { margin-bottom: 10px; color: #ccccd4; }
+        #review-content ul, #review-content ol,
+        .agent-body ul, .agent-body ol { margin: 6px 0 12px 20px; color: #ccccd4; }
+        #review-content li, .agent-body li { margin-bottom: 4px; }
+        #review-content strong, .agent-body strong { color: var(--text); }
+        #review-content code, .agent-body code {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 12px;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        /* Chat */
+        #messages { margin-bottom: 14px; }
+        .msg { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .msg.user { align-items: flex-end; }
+        .msg.assistant { align-items: flex-start; }
+        .bubble {
+            max-width: 88%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+        .msg.user .bubble {
+            background: var(--accent);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.assistant .bubble {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-bottom-left-radius: 4px;
+        }
+        .msg.assistant .bubble p { margin-bottom: 6px; }
+        .msg.assistant .bubble p:last-child { margin-bottom: 0; }
+        .msg.assistant .bubble h3 { font-size: 13px; margin: 8px 0 4px; }
+        .msg.assistant .bubble ul { margin: 4px 0 8px 16px; }
+
+        .chat-row { display: flex; gap: 8px; }
+        #chat-input {
+            flex: 1;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 14px;
+            padding: 10px 12px;
+            outline: none;
+            resize: none;
+            height: 42px;
+            line-height: 1.5;
+            transition: border-color 0.2s;
+        }
+        #chat-input:focus { border-color: var(--accent); }
+        #chat-input::placeholder { color: var(--muted); }
+        .btn-send {
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 14px;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+        }
+        .btn-send:hover { background: var(--accent-dark); }
+        .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        @media (max-width: 500px) {
+            .skill-pills { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1><span class="fl-badge">FL</span> Beat Review</h1>
+        <p>Drop your beat. Get real, actionable feedback.</p>
+    </header>
+
+    <!-- ── Upload + Form ── -->
+    <div id="upload-section">
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <div class="dz-icon">🎵</div>
+            <h2>Drop your beat here</h2>
+            <p>WAV · MP3 · FLAC · AIFF · OGG &nbsp;·&nbsp; Click to browse</p>
+        </div>
+        <input type="file" id="file-input" accept=".wav,.mp3,.flac,.aiff,.ogg">
+
+        <div id="file-chip">
+            <span class="chip-icon">🎧</span>
+            <div class="chip-info">
+                <div class="chip-name" id="chip-name"></div>
+                <div class="chip-size" id="chip-size"></div>
+            </div>
+            <button class="chip-remove" onclick="clearFile()" title="Remove">✕</button>
+        </div>
+
+        <div id="form-wrap" style="display:none">
+            <div class="card">
+                <div class="form-group">
+                    <label class="field-label" for="genre-input">Genre</label>
+                    <input type="text" id="genre-input" list="genre-list" placeholder="e.g. uk drill, trap, phonk, r&b…" autocomplete="off">
+                    <datalist id="genre-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label class="field-label" for="ref-input">Reference Artist / Track</label>
+                    <input type="text" id="ref-input" placeholder="e.g. Central Cee, Metro Boomin, Playboi Carti">
+                </div>
+                <div class="form-group">
+                    <label class="field-label">Drum Library <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional — your kits folder)</span></label>
+                    <div style="display:flex;gap:8px">
+                        <input type="text" id="drum-library-input" placeholder="/Users/pren_tzas/Desktop/kits" style="flex:1">
+                        <button type="button" class="btn-ghost" id="index-btn" onclick="buildDrumIndex()" style="white-space:nowrap;margin:0">Build Index</button>
+                    </div>
+                    <div id="drum-library-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="field-label">Sound Library <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+                    <input type="text" id="library-input" placeholder="/Users/pren_tzas/Desktop/kits">
+                    <div id="library-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+                </div>
+                <div class="form-group">
+                    <label class="field-label">Your Skill Level</label>
+                    <div class="skill-pills">
+                        <div class="skill-pill">
+                            <input type="radio" name="skill" id="sk-beg" value="beginner">
+                            <label for="sk-beg">
+                                <span class="pname">Beginner</span>
+                                <span class="pdesc">Plain English, step-by-step</span>
+                            </label>
+                        </div>
+                        <div class="skill-pill">
+                            <input type="radio" name="skill" id="sk-int" value="intermediate" checked>
+                            <label for="sk-int">
+                                <span class="pname">Intermediate</span>
+                                <span class="pdesc">Know the basics</span>
+                            </label>
+                        </div>
+                        <div class="skill-pill">
+                            <input type="radio" name="skill" id="sk-adv" value="advanced">
+                            <label for="sk-adv">
+                                <span class="pname">Advanced</span>
+                                <span class="pdesc">Dense, technical</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div id="form-error"></div>
+                <button class="btn-primary" id="analyze-btn" onclick="submitReview()">Analyze Beat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Loading ── -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <div id="load-status">Analyzing audio…</div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div id="results">
+        <button class="btn-ghost" onclick="resetApp()">← Analyze another beat</button>
+
+        <!-- Analysis -->
+        <div class="card">
+            <div class="analysis-header" onclick="toggleSection(this, 'analysis-body')">
+                <span class="section-label" style="margin-bottom:0">Audio Analysis</span>
+                <span class="chevron">▼</span>
+            </div>
+            <div id="analysis-body">
+                <div class="stat-grid" id="stat-grid"></div>
+                <div class="tag-row" id="tag-row"></div>
+            </div>
+        </div>
+
+        <!-- Research Reports -->
+        <div class="card" id="research-card" style="display:none">
+            <div class="analysis-header" onclick="toggleSection(this, 'research-body')">
+                <span class="section-label" style="margin-bottom:0">Research</span>
+                <span class="chevron">▼</span>
+            </div>
+            <div id="research-body" style="display:none; margin-top:16px">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Agent Reports (collapsible — shows each specialist's raw output) -->
+        <div class="card" id="agent-reports-card" style="display:none">
+            <div class="analysis-header" onclick="toggleSection(this, 'agent-reports-body')">
+                <span class="section-label" style="margin-bottom:0">Agent Reports</span>
+                <span class="chevron">▼</span>
+            </div>
+            <div id="agent-reports-body" style="display:none; margin-top:16px">
+                <!-- Populated by JS — one collapsible per specialist -->
+            </div>
+        </div>
+
+        <!-- Review -->
+        <div class="card">
+            <div class="section-label">Beat Review</div>
+            <div id="review-content"></div>
+        </div>
+
+        <!-- Chat -->
+        <div class="card">
+            <div class="section-label">Ask a Follow-up</div>
+            <div id="messages"></div>
+            <div class="chat-row">
+                <textarea id="chat-input" placeholder="Ask anything about your beat…" rows="1"></textarea>
+                <button class="btn-send" id="send-btn" onclick="sendChat()" title="Send">↑</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+<script>
+    let selectedFile = null;
+    let reviewPrompt  = '';
+    let chatHistory   = [];  // [{role: 'user'|'assistant', content: str}]
+
+    // Load genres into datalist
+    fetch('/genres').then(r => r.json()).then(({ genres }) => {
+        const dl = document.getElementById('genre-list');
+        genres.forEach(g => {
+            const o = document.createElement('option');
+            o.value = g;
+            dl.appendChild(o);
+        });
+    });
+
+    // ── Drag and drop ──
+    const dz = document.getElementById('drop-zone');
+    dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+    dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
+    dz.addEventListener('drop', e => {
+        e.preventDefault();
+        dz.classList.remove('over');
+        const f = e.dataTransfer.files[0];
+        if (f) setFile(f);
+    });
+    document.getElementById('file-input').addEventListener('change', e => {
+        if (e.target.files[0]) setFile(e.target.files[0]);
+    });
+
+    function setFile(file) {
+        selectedFile = file;
+        document.getElementById('chip-name').textContent = file.name;
+        document.getElementById('chip-size').textContent = fmtSize(file.size);
+        document.getElementById('file-chip').style.display = 'flex';
+        document.getElementById('form-wrap').style.display = 'block';
+        dz.style.display = 'none';
+    }
+
+    function clearFile() {
+        selectedFile = null;
+        document.getElementById('file-chip').style.display = 'none';
+        document.getElementById('form-wrap').style.display = 'none';
+        dz.style.display = 'block';
+        document.getElementById('file-input').value = '';
+    }
+
+    function fmtSize(b) {
+        return b < 1048576
+            ? (b / 1024).toFixed(1) + ' KB'
+            : (b / 1048576).toFixed(1) + ' MB';
+    }
+
+    // ── Submit ──
+    async function submitReview() {
+        const genre   = document.getElementById('genre-input').value.trim();
+        const ref     = document.getElementById('ref-input').value.trim();
+        const skill   = document.querySelector('input[name="skill"]:checked').value;
+        const errEl   = document.getElementById('form-error');
+        errEl.innerHTML = '';
+
+        if (!selectedFile)  return showErr(errEl, 'Please select an audio file.');
+        if (!genre)         return showErr(errEl, 'Please enter a genre.');
+        if (!ref)           return showErr(errEl, 'Please enter a reference artist or track.');
+
+        document.getElementById('upload-section').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+
+        const libraryPath     = document.getElementById('library-input').value.trim();
+        const drumLibraryPath = document.getElementById('drum-library-input').value.trim();
+
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        fd.append('genre', genre);
+        fd.append('reference', ref);
+        fd.append('skill_level', skill);
+        fd.append('library_path', libraryPath);
+        fd.append('drum_library_path', drumLibraryPath);
+
+        setStatus('Analyzing audio…');
+        const t1 = setTimeout(() => setStatus('Uploading to Gemini…'), 2000);
+        const t2 = setTimeout(() => setStatus('Phase 1 — Researching artist & genre…'), 5000);
+        const t3 = setTimeout(() => setStatus('Phase 2 — Running specialist agents…'), 18000);
+        const t4 = setTimeout(() => setStatus('Phase 3 — Coordinator synthesizing…'), 35000);
+
+        try {
+            const res = await fetch('/review', { method: 'POST', body: fd });
+            clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+            if (!res.ok) {
+                const e = await res.json();
+                throw new Error(e.detail || 'Something went wrong.');
+            }
+            const data = await res.json();
+            reviewPrompt = data.prompt;
+            chatHistory  = [{ role: 'assistant', content: data.review }];
+            showResults(data.audio_data, data.review, data.research_reports, data.specialist_reports);
+        } catch (err) {
+            clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+            showErr(errEl, err.message);
+        }
+    }
+
+    function setStatus(msg) { document.getElementById('load-status').textContent = msg; }
+    function showErr(el, msg) { el.innerHTML = `<div class="error-box">${msg}</div>`; }
+
+    // ── Drum library ──
+    document.getElementById('drum-library-input').addEventListener('change', checkDrumIndex);
+
+    async function checkDrumIndex() {
+        const path   = document.getElementById('drum-library-input').value.trim();
+        const status = document.getElementById('drum-library-status');
+        if (!path) { status.textContent = ''; return; }
+
+        try {
+            const res  = await fetch('/check-drum-index', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder_path: path }),
+            });
+            const data = await res.json();
+            if (data.exists) {
+                const s = data.summary;
+                const cats = Object.entries(s)
+                    .filter(([k]) => k !== 'total')
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(' · ');
+                status.textContent = `✓ Index found — ${s.total} sounds (${cats})`;
+                status.style.color = '#22c55e';
+            } else {
+                status.textContent = 'No index yet — click "Build Index" to analyse your drums.';
+                status.style.color = 'var(--muted)';
+            }
+        } catch {
+            status.textContent = '✕ Could not check folder';
+            status.style.color = 'var(--red)';
+        }
+    }
+
+    async function buildDrumIndex() {
+        const path   = document.getElementById('drum-library-input').value.trim();
+        const status = document.getElementById('drum-library-status');
+        const btn    = document.getElementById('index-btn');
+        if (!path) { status.textContent = 'Enter a folder path first.'; return; }
+
+        btn.disabled    = true;
+        btn.textContent = 'Indexing…';
+        status.textContent = 'Analysing drum sounds — this runs once and may take a minute…';
+        status.style.color = 'var(--muted)';
+
+        try {
+            const res  = await fetch('/index-drums', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder_path: path }),
+            });
+            if (!res.ok) {
+                const e = await res.json();
+                throw new Error(e.detail || 'Indexing failed.');
+            }
+            const { summary: s } = await res.json();
+            const cats = Object.entries(s)
+                .filter(([k]) => !['total','index_path'].includes(k))
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(' · ');
+            status.textContent = `✓ Indexed ${s.total} sounds (${cats})`;
+            status.style.color = '#22c55e';
+        } catch (err) {
+            status.textContent = '✕ ' + err.message;
+            status.style.color = 'var(--red)';
+        }
+
+        btn.disabled    = false;
+        btn.textContent = 'Build Index';
+    }
+
+    // ── Library path preview ──
+    let libraryTimer = null;
+    document.getElementById('library-input').addEventListener('input', () => {
+        clearTimeout(libraryTimer);
+        libraryTimer = setTimeout(previewLibrary, 700);
+    });
+
+    async function previewLibrary() {
+        const path = document.getElementById('library-input').value.trim();
+        const status = document.getElementById('library-status');
+        if (!path) { status.textContent = ''; return; }
+
+        status.textContent = 'Scanning…';
+        try {
+            const res = await fetch('/scan-library', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder_path: path }),
+            });
+            if (!res.ok) { status.textContent = '✕ Folder not found'; return; }
+            const { library } = await res.json();
+            const total = library._total_files || 0;
+            const cats  = Object.keys(library).filter(k => k !== '_total_files');
+            status.textContent = `✓ Found ${total} files — ${cats.join(', ')}`;
+            status.style.color = 'var(--green, #22c55e)';
+        } catch {
+            status.textContent = '✕ Could not scan folder';
+            status.style.color = 'var(--red)';
+        }
+    }
+
+    // ── Generic collapsible toggle ──
+    // Used by Analysis, Agent Reports, and individual agent panels.
+    function toggleSection(headerEl, bodyId) {
+        headerEl.classList.toggle('open');
+        const body = document.getElementById(bodyId);
+        body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ── Render results ──
+    function showResults(ad, review, researchReports, specialistReports) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('results').style.display = 'block';
+
+        // Stats
+        const grid = document.getElementById('stat-grid');
+        grid.innerHTML = '';
+        [
+            { label: 'BPM',            value: ad.bpm },
+            { label: 'Key',            value: ad.key,                          sm: true },
+            { label: 'Key Confidence', value: pct(ad.key_confidence) },
+            { label: 'Duration',       value: ad.duration_sec + 's' },
+            { label: 'Peak',           value: ad.peak },
+            { label: 'RMS Avg',        value: ad.rms_avg },
+        ].forEach(s => {
+            grid.innerHTML += `
+                <div class="stat">
+                    <div class="stat-label">${s.label}</div>
+                    <div class="stat-value${s.sm ? ' sm' : ''}">${s.value}</div>
+                </div>`;
+        });
+
+        // Interpretation tags
+        const tagRow = document.getElementById('tag-row');
+        tagRow.innerHTML = '';
+        (ad.interpretation || []).forEach(t => {
+            const warn = /clipping|thin|muddy|harsh|bright|bass-heavy/.test(t);
+            tagRow.innerHTML += `<span class="tag${warn ? ' warn' : ''}">${t}</span>`;
+        });
+
+        // Research reports
+        const RESEARCH_LABELS = {
+            artist: '🔍 Artist Research',
+            genre:  '🎵 Genre Research',
+        };
+        const researchCard = document.getElementById('research-card');
+        const researchBody = document.getElementById('research-body');
+        researchBody.innerHTML = '';
+        if (researchReports && Object.keys(researchReports).length > 0) {
+            Object.entries(researchReports).forEach(([key, text]) => {
+                const label = RESEARCH_LABELS[key] || key;
+                const bodyId = `research-body-${key}`;
+                const panel = document.createElement('div');
+                panel.innerHTML = `
+                    <div class="agent-header" onclick="toggleSection(this, '${bodyId}')">
+                        <span class="agent-label">${label}</span>
+                        <span class="chevron" style="color:var(--muted);font-size:12px">▼</span>
+                    </div>
+                    <div class="agent-body" id="${bodyId}">${marked.parse(text)}</div>
+                `;
+                researchBody.appendChild(panel);
+            });
+            researchCard.style.display = 'block';
+        }
+
+        // Agent reports — one collapsible per specialist
+        const AGENT_LABELS = {
+            mixing:       '🎚 Mixing Engineer',
+            drums:        '🥁 Drums & Patterns',
+            sound_design: '🎹 Sound Design & Key',
+            arrangement:  '📐 Arrangement',
+        };
+        const reportsCard = document.getElementById('agent-reports-card');
+        const reportsBody = document.getElementById('agent-reports-body');
+        reportsBody.innerHTML = '';
+        if (specialistReports && Object.keys(specialistReports).length > 0) {
+            Object.entries(specialistReports).forEach(([key, text]) => {
+                const label = AGENT_LABELS[key] || key;
+                const bodyId = `agent-body-${key}`;
+                const panel = document.createElement('div');
+                panel.innerHTML = `
+                    <div class="agent-header" onclick="toggleSection(this, '${bodyId}')">
+                        <span class="agent-label">${label}</span>
+                        <span class="chevron" style="color:var(--muted);font-size:12px">▼</span>
+                    </div>
+                    <div class="agent-body" id="${bodyId}">${marked.parse(text)}</div>
+                `;
+                reportsBody.appendChild(panel);
+            });
+            reportsCard.style.display = 'block';
+        }
+
+        // Final review
+        document.getElementById('review-content').innerHTML = marked.parse(review);
+
+        // Clear chat
+        document.getElementById('messages').innerHTML = '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function pct(v) { return v != null ? (v * 100).toFixed(0) + '%' : '—'; }
+
+    function resetApp() {
+        document.getElementById('results').style.display = 'none';
+        document.getElementById('research-card').style.display = 'none';
+        document.getElementById('research-body').innerHTML = '';
+        document.getElementById('agent-reports-card').style.display = 'none';
+        document.getElementById('agent-reports-body').innerHTML = '';
+        document.getElementById('upload-section').style.display = 'block';
+        clearFile();
+        chatHistory  = [];
+        reviewPrompt = '';
+        document.getElementById('messages').innerHTML = '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Chat ──
+    document.getElementById('chat-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+    });
+
+    async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const msg = input.value.trim();
+        if (!msg) return;
+
+        input.value = '';
+        document.getElementById('send-btn').disabled = true;
+
+        appendMsg('user', msg);
+
+        // History up to but not including the new user message
+        const historyToSend = [...chatHistory];
+        chatHistory.push({ role: 'user', content: msg });
+
+        const thinking = appendMsg('assistant', '…');
+
+        try {
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, prompt: reviewPrompt, history: historyToSend }),
+            });
+            if (!res.ok) throw new Error('Request failed.');
+            const { reply } = await res.json();
+            thinking.querySelector('.bubble').innerHTML = marked.parse(reply);
+            chatHistory.push({ role: 'assistant', content: reply });
+        } catch (err) {
+            thinking.querySelector('.bubble').textContent = 'Error: ' + err.message;
+        }
+
+        document.getElementById('send-btn').disabled = false;
+    }
+
+    function appendMsg(role, content) {
+        const wrap = document.getElementById('messages');
+        const div  = document.createElement('div');
+        div.className = `msg ${role}`;
+        const isMarkdown = role === 'assistant' && content !== '…';
+        div.innerHTML = `<div class="bubble">${isMarkdown ? marked.parse(content) : content}</div>`;
+        wrap.appendChild(div);
+        div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return div;
+    }
+</script>
+</body>
+</html>
