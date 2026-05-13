@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import os
 import tempfile
 import threading
@@ -94,6 +95,7 @@ def _run_review_job(job_id: str, tmp_path: str, genre: str, reference: str,
                         ".aiff": "audio/aiff", ".ogg": "audio/ogg"}
             mime_type = mime_map.get(suffix, "audio/wav")
             print(f"[job {job_id[:8]}] audio ready ({len(audio_bytes)//1024}KB), starting agents…")
+            gc.collect()
         finally:
             os.unlink(tmp_path)
 

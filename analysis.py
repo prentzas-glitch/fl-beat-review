@@ -1,3 +1,4 @@
+import gc
 import os
 import numpy as np
 import librosa
@@ -86,7 +87,7 @@ def analyze_audio(file_path: str) -> dict:
         raise ValueError(f"Unsupported format. Supported: {', '.join(SUPPORTED_FORMATS)}")
 
     print("Analyzing audio...")
-    y, sr = librosa.load(file_path, mono=True, duration=60.0)
+    y, sr = librosa.load(file_path, mono=True, sr=16000, duration=30.0)
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     bpm = round(float(np.mean(tempo)), 1)
@@ -101,7 +102,7 @@ def analyze_audio(file_path: str) -> dict:
 
     low_mask = (freqs >= 20) & (freqs < 250)
     mid_mask = (freqs >= 250) & (freqs < 4000)
-    high_mask = (freqs >= 4000) & (freqs < 16000)
+    high_mask = freqs >= 4000
 
     low_band = float(stft[low_mask].mean()) if np.any(low_mask) else 0.0
     mid_band = float(stft[mid_mask].mean()) if np.any(mid_mask) else 0.0
@@ -130,5 +131,8 @@ def analyze_audio(file_path: str) -> dict:
             "high": round(high_band, 4),
         },
     }
+
+    del y, stft, rms, onset_env
+    gc.collect()
 
     return interpret_audio(raw)
