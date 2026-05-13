@@ -58,6 +58,10 @@ production briefing on the following. Focus on actionable details a producer can
 - Key/scale preferences
 - Notable FL Studio or production techniques
 
+IMPORTANT: If you don't have specific knowledge of "{reference}", do NOT say you can't help.
+Instead, infer what their sound likely is based on context clues in the name, then describe
+what a producer aiming for that style in {genre} would typically do. Make it actionable.
+
 === Genre: {genre} (current trends 2024-2025) ===
 - What separates a top-tier {genre} beat from an average one right now
 - Typical BPM range and drum feel
